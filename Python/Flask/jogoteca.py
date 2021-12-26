@@ -1,35 +1,26 @@
 from flask import Flask, render_template, request, redirect, session, flash, url_for
+from dao import JogoDao, UsuarioDao
+import pymysql
+from models import Jogo, Usuario
+
 
 app = Flask(__name__)
 app.secret_key = 'NadaAqui'
+app.config['MYSQL_HOST'] = "localhost"
+app.config['MYSQL_USER'] = "root"
+app.config['MYSQL_PASSWORD'] = "1945"
+app.config['MYSQL_DB'] = "jogoteca"
+app.config['MYSQL_PORT'] = 3306
 
+db = pymysql.connect(host='localhost', user='root', db='jogoteca', password='1945')
 
-class Jogo:
-    def __init__(self, nome, categoria, console):
-        self.nome = nome
-        self.categoria = categoria
-        self.console = console
-
-
-class Usuario:
-    def __init__(self, id, nome, senha):
-        self.id = id
-        self.nome = nome
-        self.senha = senha
-
-
-usuario1 = Usuario('Felipe', 'Felipe Carvalho', 'carvalho')
-usuario2 = Usuario('Lisa', 'Lisa Araujo', 'araujo')
-usuarios = {usuario1.id: usuario1, usuario2.id: usuario2}
-
-jogo1 = Jogo('Super Mario', 'Ação', 'SNES')
-jogo2 = Jogo('Pokemon Gold', 'RPG', 'GBA')
-jogo3 = Jogo('Mortal Kombat', 'Luta', 'SNES')
-lista = [jogo1, jogo2, jogo3]
+jogo_dao = JogoDao(db)
+usuario_dao = UsuarioDao(db)
 
 
 @app.route('/')
 def index():
+    lista = jogo_dao.listar()
     return render_template(
         'lista.html',
         titulo='Jogos',
@@ -53,7 +44,7 @@ def criar():
     categoria = request.form['categoria']
     console = request.form['console']
     jogo = Jogo(nome, categoria, console)
-    lista.append(jogo)
+    jogo_dao.salvar(jogo)
     return redirect(url_for('index'))
 
 
@@ -65,8 +56,8 @@ def login():
 
 @app.route('/autenticar', methods=['POST',])
 def autenticar():
-    if request.form['usuario'] in usuarios:
-        usuario = usuarios[request.form['usuario']]
+    usuario = usuario_dao.buscar_por_id(request.form['usuario'])
+    if usuario:
         if usuario.senha == request.form['senha']:
             session['usuário_logado'] = usuario.id
             flash(f"{usuario.nome} logou com sucesso!")
