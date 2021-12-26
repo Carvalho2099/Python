@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, redirect, session, flash, url_for
+from flask import Flask, render_template, request, redirect, session, flash, url_for, send_from_directory
 from dao import JogoDao, UsuarioDao
 import pymysql
-from models import Jogo, Usuario
+from models import Jogo
+import os
 
 
 app = Flask(__name__)
@@ -11,6 +12,7 @@ app.config['MYSQL_USER'] = "root"
 app.config['MYSQL_PASSWORD'] = "1945"
 app.config['MYSQL_DB'] = "jogoteca"
 app.config['MYSQL_PORT'] = 3306
+app.config['UPLOAD_PATH'] = os.path.dirname(os.path.abspath(__file__)) + '/uploads'
 
 db = pymysql.connect(host='localhost', user='root', db='jogoteca', password='1945')
 
@@ -44,7 +46,11 @@ def criar():
     categoria = request.form['categoria']
     console = request.form['console']
     jogo = Jogo(nome, categoria, console)
-    jogo_dao.salvar(jogo)
+    jogo = jogo_dao.salvar(jogo)
+
+    arquivo = request.files['arquivo']
+    upload_path = app.config['UPLOAD_PATH']
+    arquivo.save(f'{upload_path}/capa{jogo.id}.jpg')
     return redirect(url_for('index'))
 
 
@@ -53,10 +59,12 @@ def editar(id):
     if 'usuário_logado' not in session or session['usuário_logado'] == None:
         return redirect(url_for('login', proxima=url_for('edit')))
     jogo = jogo_dao.busca_por_id(id)
+    capa_jogo = f'capa{id}.jpg'
     return render_template(
         'edit.html',
         titulo='Editando Jogo',
-        jogo=jogo
+        jogo=jogo,
+        capa_jogo=capa_jogo
     )
 
 
@@ -101,6 +109,11 @@ def logout():
     session['usuário_logado'] = None
     flash('Nenhum usuário logado.')
     return redirect(url_for('index'))
+
+
+@app.route('/uploads/<nome_arquivo>')
+def imagem(nome_arquivo):
+    return send_from_directory('uploads', nome_arquivo)
 
 
 app.run(debug=True)
