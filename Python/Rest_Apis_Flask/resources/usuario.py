@@ -7,6 +7,7 @@ from blacklist import BLACKLIST
 atributos = reqparse.RequestParser()
 atributos.add_argument('login', type=str, required=True, help="The field 'login' cannot be left blank.")
 atributos.add_argument('senha', type=str, required=True, help="The field 'senha' cannot be left blank.")
+atributos.add_argument('ativado', type=bool)
 
 class User(Resource):
     def get(self, user_id):
@@ -32,6 +33,7 @@ class UserRegister(Resource):
         if UserModel.find_by_login(dados['login']):
             return {"message": f"The login{dados['login']} already exists"}
         user = UserModel(**dados)
+        user.ativado = False
         user.save_user()
         return {"message": "User created successfully!"}, 201
 
@@ -41,8 +43,10 @@ class UserLogin(Resource):
         dados = atributos.parse_args()
         user = UserModel.find_by_login(dados['login'])
         if user and safe_str_cmp(user.senha, dados['senha']):
-            token_de_acesso = create_access_token(identity=user.user_id)
-            return {"access_Token": token_de_acesso}, 200
+            if user.ativado:
+                token_de_acesso = create_access_token(identity=user.user_id)
+                return {"access_Token": token_de_acesso}, 200
+            return {"message": "user not confirmed."}, 400
         return {"message":"The username or password is incorrect."}, 401
 
 class UserLogout(Resource):
@@ -51,3 +55,15 @@ class UserLogout(Resource):
         jwt_id = get_jwt()["jti"]
         BLACKLIST.add(jwt_id)
         return {"message": "logged out successfully!"}, 200
+
+class UserConfirm(Resource):
+    @classmethod
+    def get(cls, user_id):
+        user = UserModel.find_user(user_id)
+
+        if not user:
+            return {"message": f"User id {user_id} not found."}, 404
+
+        user.ativado = True
+        user.save_user()
+        return  {"message": f"User id {user_id} confirmed successfully."}, 200
